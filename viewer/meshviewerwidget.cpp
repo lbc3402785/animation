@@ -13,8 +13,8 @@ MeshViewerWidget::MeshViewerWidget(QWidget* parent)
 {
     //timerId = startTimer(50);
     ModelSequence model;
-    model.W=2048;
-    model.H=2048;
+//    model.setH(2048);
+//    model.setW(2048);
     model.Init("..\\modelsequence\\data\\WomenFullHead1216.npz","..\\modelsequence\\data\\shape_predictor_68_face_landmarks.dat",
                "..\\modelsequence\\data\\WomanFace.png","..\\modelsequence\\data\\WomanHead.jpg","",
                "..\\modelsequence\\data\\WomanMask1.png","..\\modelsequence\\data\\women.ini");
@@ -152,14 +152,23 @@ void MeshViewerWidget::ReadVideo(const std::string &videoPath)
     cur=0;
     first=true;
     int fps=sequence.get(CAP_PROP_FPS);
+    std::cout<<"fps:"<<fps<<std::endl;
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(play()));
      timer->start((1000/fps));
-     namedWindow("video",CV_WINDOW_AUTOSIZE|CV_GUI_EXPANDED|CV_WINDOW_KEEPRATIO);
+         time.start();
+
+     //namedWindow("video",CV_WINDOW_AUTOSIZE|CV_GUI_EXPANDED|CV_WINDOW_KEEPRATIO);
+}
+
+void MeshViewerWidget::PauseOrResumeVideo()
+{
+    pause=!pause;
 }
 
 void MeshViewerWidget::play()
 {
+    if(pause)return;
     if(!models.empty()){
         MatF model=models.front();
         models.pop_front();
@@ -183,10 +192,20 @@ void MeshViewerWidget::play()
     }
     if(cur<count-1){
         sequence >> image;
+
         if(image.empty()){
-            std::cerr<<"read pic fail!"<<std::endl;
+//            std::cerr<<"read pic fail!"<<std::endl;
+//            std::cout<<"stop:"<<std::endl;
+            std::cout<<cur*1000.0/time.elapsed()<<std::endl;
+            timer->stop();
+            destroyWindow("video");
+            return;
         }
+        cv::resize(image,image,cv::Size(),0.5,0.5);
+        //std::cout<<"---------------------------cur:"<<cur<<std::endl;
+        //time.start();
         std::tie(models,uvs,faceTextures)=modelPtr->readOnePic(image,first,false);
+
         if(!models.empty()){
             MatF model=models.front();
             models.pop_front();
@@ -205,12 +224,14 @@ void MeshViewerWidget::play()
             textures[0]->setMagnificationFilter(QOpenGLTexture::Linear);
             textures[0]->setWrapMode(QOpenGLTexture::Repeat);
             update();
-            modelPtr->draw(faceTexture);
-            cv::imshow("video",faceTexture);
+           // modelPtr->draw(faceTexture);
+            //cv::imshow("video",faceTexture);
         }
         cur++;
+        //std::cout<<time.elapsed()<<std::endl;
     }else{
-        std::cout<<"stop:"<<std::endl;
+
+        //std::cout<<"stop:"<<std::endl;
         timer->stop();
         destroyWindow("video");
     }

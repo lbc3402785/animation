@@ -8,13 +8,16 @@
 #include "QGLViewerWidget.h"
 #include <deque>
 #include <QOpenGLTexture>
+#include <QTime>
 #include "modelsequence.h"
 class MeshViewerWidget : public QGLViewerWidget
 {
     Q_OBJECT
 public:
+    QTime time;
     std::shared_ptr<ModelSequence> modelPtr;
     bool isUpdate = false;
+    bool pause=false;
     int timerId;
     int headOffset = 46398;
     int headTriOffset = 92356;
@@ -34,6 +37,7 @@ public:
     virtual ~MeshViewerWidget(void);
     bool LoadMesh(const std::string & filename);
     void ReadVideo(const std::string & dir);
+    void PauseOrResumeVideo();
     void Clear(void);
     void UpdateMesh(void);
     bool SaveMesh(const std::string & filename);

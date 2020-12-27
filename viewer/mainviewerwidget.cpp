@@ -98,6 +98,12 @@ void MainViewerWidget::ReadVideo(void)
     }
 }
 
+void MainViewerWidget::PauseOrResumeVideo()
+{
+    meshviewerwidget->PauseOrResumeVideo();
+    emit(havePauseOrResume(meshviewerwidget->pause));
+}
+
 void MainViewerWidget::Save(void)
 {
     QString fileName = QFileDialog::getSaveFileName(this,

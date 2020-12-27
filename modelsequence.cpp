@@ -14,10 +14,20 @@ void ModelSequence::InitImages(string mskimage, string face, string head, string
     FaceTexture = imread(face);//人脸模板图
     HeadTexture=imread(head);//头部模板图
     //BodyTexture=imread(body);//身体模板图
-    if(FaceTexture.size!=HeadTexture.size||FaceTexture.size!=Pymsk.size||FaceTexture.rows!=H||FaceTexture.cols!=W){
-        std::cerr<<"size is not match"<<std::endl;
+    if(FaceTexture.size!=HeadTexture.size){
+        std::cerr<<"FaceTexture.size,HeadTexture.size:"<<FaceTexture.size<<","<<HeadTexture.size<<std::endl;
         exit(EXIT_FAILURE);
     }
+    if(FaceTexture.size!=Pymsk.size){
+        std::cerr<<"FaceTexture.size,Pymsk.size:"<<FaceTexture.size<<","<<Pymsk.size<<std::endl;
+        exit(EXIT_FAILURE);
+    }
+    if(FaceTexture.rows!=H||FaceTexture.cols!=W){
+//        cv::resize(FaceTexture,FaceTexture,cv::Size(),W/FaceTexture.cols,H/FaceTexture.rows);
+//        cv::resize(HeadTexture,HeadTexture,cv::Size(),W/HeadTexture.cols,H/HeadTexture.rows);
+//        cv::resize(Pymsk,Pymsk,cv::Size(),W/Pymsk.cols,H/Pymsk.rows);
+    }
+
 }
 
 void ModelSequence::InitModel(string npzPath, string dlibPath, string keyFilePath)
@@ -26,11 +36,11 @@ void ModelSequence::InitModel(string npzPath, string dlibPath, string keyFilePat
     FaceModel bfmShape;
     bfmShape.Initialize(npzPath,true,false);
     Preprocess::loadKeyIndex(keyFilePath,keys,true);
-//    {
-//        Eigen::Matrix3Xf BFMpoints=bfmShape.Face.transpose();
-//        Eigen::Matrix3Xi BFMFaces=bfmShape.TRI.transpose();
-//        EigenFunctions<float>::saveEigenPointsWithKey(BFMpoints,BFMFaces,keys,"BFMkeys.obj");
-//    }
+    //    {
+    //        Eigen::Matrix3Xf BFMpoints=bfmShape.Face.transpose();
+    //        Eigen::Matrix3Xi BFMFaces=bfmShape.TRI.transpose();
+    //        EigenFunctions<float>::saveEigenPointsWithKey(BFMpoints,BFMFaces,keys,"BFMkeys.obj");
+    //    }
     //std::cout<<"HEAD_OFFSET:"<<bfmShape.HEAD_OFFSET<<std::endl;
     //std::cout<<"TRI_FACE.rows():"<<bfmShape.TRI_FACE.rows()<<std::endl;
     FaceModel bfmKeyShape;
@@ -81,6 +91,7 @@ void ModelSequence::InitModel(string npzPath, string dlibPath, string keyFilePat
     denseSolver.setRoi(roi);
     //std::cout<<"setRoi done!"<<std::endl;
     laplaceSolverPtr=std::make_shared<DenseLaplace<float>>(denseSolver);
+    generatedUV=bfmShape.UV;
 }
 
 MatF ModelSequence::computeKey3D(MatF &lastKey3D, MatF &lastKey2D, MatF &KP,float fx)
@@ -101,6 +112,26 @@ MatF ModelSequence::computeKey3D(MatF &lastKey3D, MatF &lastKey2D, MatF &KP,floa
     result.col(0)=q1t;
     result.col(1)=q2t;
     return result;
+}
+
+int ModelSequence::getW() const
+{
+    return W;
+}
+
+void ModelSequence::setW(int value)
+{
+    W = value;
+}
+
+int ModelSequence::getH() const
+{
+    return H;
+}
+
+void ModelSequence::setH(int value)
+{
+    H = value;
 }
 
 void ModelSequence::draw(Mat &input)
@@ -127,23 +158,23 @@ bool ModelSequence::gerenateFromOnePic(string picPath)
 {
     cv::Mat input=cv::imread(picPath);
 
-    if(KeypointDetectgion(ImageProcess::LaplacianEnhance(input), KP)){
-        cv::Mat show=input.clone();
-        for (size_t i = 0; i < KP.rows(); i++)
-        {
-            auto x = KP(i, 0);
-            auto y = KP(i, 1);
-            circle(show, Point(x, y), 8, Scalar(255, 0, 0, 255), -1, CV_AA);
-        }
-        cv::imshow("11",show);
-        cv::waitKey(0);
+    if(KeypointDetectgion(input, KP)){
+//        cv::Mat show=input.clone();
+//        for (size_t i = 0; i < KP.rows(); i++)
+//        {
+//            auto x = KP(i, 0);
+//            auto y = KP(i, 1);
+//            circle(show, Point(x, y), 8, Scalar(255, 0, 0, 255), -1, CV_AA);
+//        }
+//        cv::imshow("11",show);
+//        cv::waitKey(0);
         if(center){
             KP.col(0).array()-=input.cols/2;
             KP.col(1).array()-=input.rows/2;
         }
         double fx=focalLengthmm*static_cast<double>(input.cols)/sensorWidth;
         solver.fx=fx;
-        generateModel(input,"50");
+        generateModel(input,"15",true);
         return true;
     }
     return false;
@@ -153,17 +184,24 @@ bool ModelSequence::Init(string npzPath, string dlibPath, string facePath, strin
 {
     InitImages(maskPath,facePath,headPath,bodyPath);
     InitModel(npzPath,dlibPath,keyFilePath);
-    MatF EV=solver.FMFull.EV;
-    int n=EV.rows();
-    rv=VectorXf::Ones(n);
+    MatF SV=solver.FMFull.SV;
+    int n=SV.rows();
+    rsv=VectorXf::Ones(n);
     for(int k=0;k<n;k++){
-        rv(k)=1/EV(k,0);
+        rsv(k)=1/SV(k,0);
     }
-    rv.normalize();
-    rv*=n*lambda;
+    rsv.normalize();
+    MatF EV=solver.FMFull.EV;
+    n=EV.rows();
+    rev=VectorXf::Ones(n);
+    for(int k=0;k<n;k++){
+        rev(k)=1/EV(k,0);
+    }
+    rev.normalize();
+    firstLoc<<0,0,0;
     return true;
 }
-bool ModelSequence::KeypointDetectgion(Mat image, MatF &KP)
+bool ModelSequence::KeypointDetectgion(Mat& image, MatF &KP)
 {
     if(image.empty())return false;
     vector<vector<Point>> keypoints;
@@ -190,26 +228,31 @@ bool ModelSequence::generateModel(Mat &image,std::string name,bool save)
     solver.params.tx=100;
     solver.params.ty=100;
     solver.params.ty=500;
-    solver.SolvePerspective2(KP);
+    //solver.SolvePerspective2(KP);
+    solver.SolvePerspective1(KP,rsv,rev);
     if(save){
-        output(image,name);
+        output(image,name,true);
     }
     return true;
 }
 
-std::tuple<MatF,MatF,cv::Mat> ModelSequence::output(Mat &image, string name,bool save)
+std::tuple<MatF,MatF,cv::Mat> ModelSequence::output(Mat &image, string name,bool first,bool save)
 {
-    MatF model;
-    MatF UV;
-    Mat texture;
-
-    auto Face = solver.FMFull.Generate(solver.SX, solver.EX);
-    MatF rotateFace=Face*solver.params.R.transpose();
+    solver.FMFull.Generate(solver.SX, solver.EX);
+    MatF& Face =solver.FMFull.GeneratedFace;
+    MatF rotateFace=solver.FMFull.GeneratedFace*solver.params.R.transpose();
+    if(!first){
+        rotateFace.col(0).array()+=solver.params.tx-firstLoc(0);
+        rotateFace.col(1).array()+=solver.params.ty-firstLoc(1);
+        rotateFace.col(2).array()+=solver.params.tz-firstLoc(2);
+    }
     rotateFace.col(1).array()*=-1;
     rotateFace.col(2).array()*=-1;
+
     laplaceSolverPtr->updatePoints(rotateFace.data(),rotateFace.size());
     laplaceSolverPtr->solve(target);
     rotateFace=laplaceSolverPtr->getDst();
+
     if(0){
         Mat origin=MMSPerspectiveTexture(image,solver,H,W,center);
         Scalar diff;
@@ -220,9 +263,9 @@ std::tuple<MatF,MatF,cv::Mat> ModelSequence::output(Mat &image, string name,bool
             //MMSObjWithTexture(result*255, solver, outfolder, name);
             MMSObj2(rotateFace,solver,outfolder,name);
         }
-        texture=origin;
+        return std::make_tuple(rotateFace,solver.FMFull.UV,origin);
     }else{
-        texture=image;
+        //time.start();
         MatF frontFace=Face.topRows(headOffset);
         MatF frontFacePro = solver.PerspectiveProjection(solver.params, frontFace);
         if(center){
@@ -231,21 +274,18 @@ std::tuple<MatF,MatF,cv::Mat> ModelSequence::output(Mat &image, string name,bool
         }
         frontFacePro.col(0)/=image.cols;
         frontFacePro.col(1)/=image.rows;
-        MatF mergeUV=solver.FMFull.UV;
-        mergeUV.topRows(headOffset)=frontFacePro;
-        UV=mergeUV;
+        generatedUV.topRows(headOffset)=frontFacePro;
+        //std::cout<<"PerspectiveProjection:"<<time.elapsed()<<std::endl;
         if(save){
             cv::imwrite(outfolder+name + "Face.png",image );
             cv::imwrite(outfolder+name+"Head.png",HeadTexture);
             Eigen::Matrix3Xf points=rotateFace.transpose();
             Eigen::Matrix3Xi faces=solver.FMFull.TRI.transpose();
-            Eigen::Matrix2Xf uvs=mergeUV.transpose();
+            Eigen::Matrix2Xf uvs=generatedUV.transpose();
             EigenFunctions<float>::saveEigenPointsWithUV(points,faces,uvs,"output\\"+name+".obj");
         }
+        return std::make_tuple(rotateFace,generatedUV,image);
     }
-    model=rotateFace;
-
-    return std::make_tuple(model,UV,texture);
 }
 
 void ModelSequence::readVideo(string videoPath)
@@ -260,9 +300,14 @@ void ModelSequence::readVideo(string videoPath)
     int count=sequence.get(CAP_PROP_FRAME_COUNT);
     cv::Mat image;
     bool first=true;
-    for(int k=0;k<count;k++){
+    for(int k=0;k</*count-1*/2;k++){
         sequence >> image;
+        if(image.empty())break;
         readOnePic(image,first,true);
+//        std::cout<<"SX:"<<solver.SX<<std::endl;
+//        std::cout<<"---------------"<<std::endl;
+//        std::cout<<"EX:"<<solver.EX<<std::endl;
+//        std::cout<<"---------------"<<std::endl;
     }
 }
 
@@ -276,8 +321,11 @@ std::tuple<std::deque<MatF>,std::deque<MatF>,std::deque<cv::Mat>> ModelSequence:
     MatF model;
     MatF uv;
     Mat texture;
-    if(first){
-        if(KeypointDetectgion(ImageProcess::LaplacianEnhance(image), KP)){
+    MatF Face = solver.FM.Face;
+    MatF S = Face * 0;
+    MatF E = Face * 0;
+    if(first){       
+        if(KeypointDetectgion(image, KP)){
             if(center){
                 KP.col(0).array()-=image.cols/2;
                 KP.col(1).array()-=image.rows/2;
@@ -289,25 +337,34 @@ std::tuple<std::deque<MatF>,std::deque<MatF>,std::deque<cv::Mat>> ModelSequence:
             solver.params.tx=100;
             solver.params.ty=100;
             solver.params.ty=500;
-            solver.SolvePerspective2(KP);
+            //solver.SolvePerspective2(KP);
+            solver.SolvePerspective1(KP,rsv,rev);
+            firstLoc<<solver.params.tx,solver.params.ty,solver.params.tz;
             solver.FM.Generate(solver.SX, solver.EX*0);
             shapeKey3D=solver.Transform(solver.params,solver.FM.GeneratedFace);
             solver.FMFull.Generate(solver.SX, solver.EX);
             solver.FM.Generate(solver.SX, solver.EX);
             lastKP=KP;
             lastImage=image;
+            lastSX=solver.SX;
             lastEX=solver.EX;
             v0=solver.params.R;
-            first=false;
-            std::tie(model,uv,texture)=output(image, std::to_string(success),save);
+            lastDelta=std::acos(v0.w())*2;
+            lastZMove=std::fabs(solver.params.tz);
+            std::tie(model,uv,texture)=output(image, std::to_string(success),first,save);
             models.emplace_back(model);
             uvs.emplace_back(uv);
             textures.emplace_back(texture);
             success++;
+            first=false;
+//            std::cout<<"SX:"<<solver.SX<<std::endl;
+//            std::cout<<"---------------"<<std::endl;
+//            std::cout<<"EX:"<<solver.EX<<std::endl;
+//            std::cout<<"============="<<std::endl;
         }
+
     }else{
         if(KeypointDetectgion(image, KP)){
-
             if(center){
                 KP.col(0).array()-=image.cols/2;
                 KP.col(1).array()-=image.rows/2;
@@ -324,65 +381,122 @@ std::tuple<std::deque<MatF>,std::deque<MatF>,std::deque<cv::Mat>> ModelSequence:
             Eigen::Vector3f t0(solver.params.tx,solver.params.ty,solver.params.tz);
             Eigen::Matrix3f R1=initTransform.getRotation()*R0;
             Eigen::Vector3f t1=initTransform.getRotation()*t0+initTransform.getTranslation();
+            float zmove=std::fabs(initTransform.getTranslation()(2));
+            //std::cout<<"zmove:"<<zmove<<std::endl;
             solver.params.R=R1;
             solver.params.tx=t1(0);
             solver.params.ty=t1(1);
             solver.params.tz=t1(2);
-            //                MatF EX=solver.SolveShape2(solver.params,shapeKey3D,key3D,solver.FM.EB,0.008f);
-            MatF EX=solver.SolveShape3(solver.params,shapeKey3D,key3D,solver.FM.EB,rv);
+            MatF EX=solver.EX*0;
+            if(zmove>0.1f||zmove>lastZMove*10){
+                //std::cout<<"last move,large move:"<<lastZMove<<","<<zmove<<std::endl;
+                MatF SX=solver.SX*0;
+                MatF S=solver.FM.Face*0;
+                MatF E=solver.FM.Face*0;
+                for (size_t i = 0; i < 2; i++)
+                {
+                    expressKey3D=solver.Transform(solver.params,solver.FM.Face+E);
+                    SX=solver.SolveShape3(solver.params,expressKey3D,key3D,solver.FM.SB,rsv*lambdaSX[i]);
+                    MatF FaceS = solver.FM.SB *SX;
+                    S = Reshape(FaceS, 3);
+                    shapeKey3D=solver.Transform(solver.params,solver.FM.Face+S);
+                    EX=solver.SolveShape3(solver.params,shapeKey3D,key3D,solver.FM.EB,rev*lambdaEX[i]);
+                    MatF FaceE = solver.FM.EB * EX;
+                    E = Reshape(FaceE, 3);
+                    Face = solver.FM.Face + S + E;
+                }
+                solver.SX=SX;
+//                            std::cout<<"SX:"<<SX<<std::endl;
+//                            std::cout<<"---------------"<<std::endl;
+//                            std::cout<<"EX:"<<EX<<std::endl;
+//                            std::cout<<"---------------"<<std::endl;
+            }else{
+               // std::cout<<"zmove:"<<zmove<<std::endl;
+                EX=solver.SolveShape3(solver.params,shapeKey3D,key3D,solver.FM.EB,rev*0.6);
+//                std::cout<<"EX:"<<solver.EX<<std::endl;
+//                std::cout<<"======================="<<std::endl;
+            }
+            lastZMove=zmove;
             v1=R1;
-            Quaternionf v01=v0.slerp(0.3,v1);
-            Eigen::Matrix3f R01=v01.toRotationMatrix();
-            Eigen::Vector3f t01=0.6*t0+0.4*t1;
-            solver.params.R=R01;
-            solver.params.tx=t01(0);
-            solver.params.ty=t01(1);
-            solver.params.tz=t01(2);
-            if(success>=2){
-                solver.EX=(lastEX*0.3+solver.EX*0.3+EX*0.4);
-            }else if(success>=1){
-                solver.EX=(solver.EX*0.6+EX*0.4);
+            if(v0.dot(v1)<0){
+                v1.coeffs()*=-1;
             }
-            cv::Mat interImage=0.6*lastImage+0.4*image;
-            std::tie(model,uv,texture)=output(interImage,std::to_string(success),save);
-            models.emplace_back(model);
-            uvs.emplace_back(uv);
-            textures.emplace_back(texture);
-            lastEX=solver.EX;
+            Quaternionf vibration=v1*v0.conjugate();
+            vibration.normalize();
+            float delta=std::acos(vibration.w())*2;
+            if(0/*delta>0.5*M_PI/180||delta>2*lastDelta*/){
+                //std::cout<<"hit one!"<<std::endl;
+                Quaternionf v01=v0.slerp(0.4,v1);
+                Eigen::Matrix3f R01=v01.toRotationMatrix();
+                Eigen::Vector3f t01=0.6*t0+0.4*t1;
+                solver.params.R=R01;
+                solver.params.tx=t01(0);
+                solver.params.ty=t01(1);
+                solver.params.tz=t01(2);
+                if(success>=2){
+                    //solver.SX=/*(lastSX*0.3+solver.SX*0.3+SX*0.4)*/SX;
+                    solver.EX=(lastEX*0.2+solver.EX*0.3+EX*0.5);
+                }else if(success>=1){
+                    //solver.SX=/*(solver.SX*0.6+SX*0.4)*/SX;
+                    solver.EX=(solver.EX*0.5+EX*0.5);
+                }
+                cv::Mat interImage=0.5*lastImage+0.5*image;
+                std::tie(model,uv,texture)=output(interImage,std::to_string(success),first,save);
+                models.emplace_back(model);
+                uvs.emplace_back(uv);
+                textures.emplace_back(texture);
+                success++;
+                if(delta>M_PI/180||delta>3*lastDelta){
+                    //std::cout<<"hit two!"<<std::endl;
+                    //===================================================
+                    Quaternionf v02=v0.slerp(0.7,v1);
+                    Eigen::Matrix3f R02=v02.toRotationMatrix();
+                    Eigen::Vector3f t02=0.3*t0+0.7*t1;
+                    solver.params.R=R02;
+                    solver.params.tx=t02(0);
+                    solver.params.ty=t02(1);
+                    solver.params.tz=t02(2);
+                    if(success>=2){
+                        //solver.SX=/*(lastSX*0.2+solver.SX*0.2+SX*0.6)*/SX;
+                        solver.EX=(lastEX*0.1+solver.EX*0.2+EX*0.7);
+                    }else if(success>=1){
+                        //solver.SX=/*(solver.SX*0.4+SX*0.6)*/SX;
+                        solver.EX=(solver.EX*0.3+EX*0.7);
+                    }
+                    cv::Mat interImage2=0.3*lastImage+0.7*image;
+                    std::tie(model,uv,texture)=output(interImage2,std::to_string(success+1),first,save);
+                    models.emplace_back(model);
+                    uvs.emplace_back(uv);
+                    textures.emplace_back(texture);
+                    success++;
+                }
 
-            //===================================================
-            Quaternionf v02=v0.slerp(0.6,v1);
-            Eigen::Matrix3f R02=v02.toRotationMatrix();
-            Eigen::Vector3f t02=0.4*t0+0.6*t1;
-            solver.params.R=R02;
-            solver.params.tx=t02(0);
-            solver.params.ty=t02(1);
-            solver.params.tz=t02(2);
-            if(success>=2){
-                solver.EX=(lastEX*0.2+solver.EX*0.2+EX*0.6);
-            }else if(success>=1){
-                solver.EX=(solver.EX*0.4+EX*0.6);
             }
-            cv::Mat interImage2=0.4*lastImage+0.6*image;
-            std::tie(model,uv,texture)=output(interImage2,std::to_string(success+1),save);
-            models.emplace_back(model);
-            uvs.emplace_back(uv);
-            textures.emplace_back(texture);
+            lastDelta=delta;
+            lastSX=solver.SX;
             lastEX=solver.EX;
             //solver.params.R=EigenFunctions<float>::rodrigues(v2);
             solver.params.R=R1;
             solver.params.tx=t1(0);
             solver.params.ty=t1(1);
             solver.params.tz=t1(2);
+            //solver.SX=SX;
             solver.EX=EX;
-            std::tie(model,uv,texture)=output(image,std::to_string(success+2),save);
+//            std::cout<<"SX:"<<solver.SX<<std::endl;
+//            std::cout<<"---------------"<<std::endl;
+//            std::cout<<"EX:"<<solver.EX<<std::endl;
+//            std::cout<<"---------------"<<std::endl;
+
+            std::tie(model,uv,texture)=output(image,std::to_string(success+2),first,save);
+
             models.emplace_back(model);
             uvs.emplace_back(uv);
             textures.emplace_back(texture);
             lastKP=KP;
             lastImage=image;
             v0=v1;
-            success+=3;
+            success++;
+//            std::cout<<"total:"<<time.elapsed()<<std::endl;
         }
 
     }

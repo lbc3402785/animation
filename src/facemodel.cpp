@@ -22,6 +22,7 @@ void FaceModel::Initialize(string file, bool LoadEdge,bool LoadColor)
     MatF FaceFlat = SM + EM; // 204 * 1
     Face = Reshape(FaceFlat, 3);
     originFace=Face;
+    GeneratedFace=Face;
     try {
         TRI = ToEigenInt(npz["TRI"]);
         std::cout<<"TRI"<<std::endl;
@@ -127,7 +128,7 @@ void FaceModel::Initialize(string file, bool LoadEdge,bool LoadColor)
 }
 
 
-MatF FaceModel::Generate(MatF SX, MatF EX)
+MatF& FaceModel::Generate(MatF SX, MatF EX)
 {
     MatF FaceS = SB * SX;
     MatF S = Reshape(FaceS, 3);

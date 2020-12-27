@@ -21,25 +21,28 @@ void MMSolver::Initialize(string file, string file2)
         FMFull.SB.col(0) *= 0;
     }
 }
-MatF MMSolver::PerspectiveProjection(ProjectionParameters p, MatF model_points)
+MatF MMSolver::PerspectiveProjection(ProjectionParameters& p, MatF& model_points)
 {
     MatF rotated=model_points*p.R.transpose();
     rotated.col(0).array() += p.tx;
     rotated.col(1).array() += p.ty;
     rotated.col(2).array() += p.tz;
     MatF zs=rotated.col(2);
-    MatF fs=MatF::Ones(zs.rows(),zs.cols())*fx;
-    MatF rs=fs.array()/zs.array();
-    MatF xs=rotated.col(0);
-    MatF ys=rotated.col(1);
-    xs=rs.array()*xs.array();
-    ys=rs.array()*ys.array();
-    MatF pro=MatF::Zero(rotated.rows(),2);
-    pro.col(0)=xs;
-    pro.col(1)=ys;
-    return pro;
+//    MatF fs=MatF::Ones(zs.rows(),zs.cols())*fx;
+//    MatF rs=fs.array()/zs.array();
+//    MatF xs=rotated.col(0);
+//    MatF ys=rotated.col(1);
+//    xs=rs.array()*xs.array();
+//    ys=rs.array()*ys.array();
+//    MatF pro=MatF::Zero(rotated.rows(),2);
+//    pro.col(0)=xs;
+//    pro.col(1)=ys;
+    MatF pro=rotated.leftCols(2)*fx;
+    pro.col(0).array()/=zs.array();
+    pro.col(1).array()/=zs.array();
+    return std::move(pro);
 }
-MatF MMSolver::Transform(ProjectionParameters p, MatF model_points)
+MatF MMSolver::Transform(ProjectionParameters& p, MatF model_points)
 {
     MatF rotated=model_points*p.R.transpose();
     rotated.col(0).array() += p.tx;
@@ -106,6 +109,64 @@ MatF MMSolver::SolveShapePerspective(ProjectionParameters p, MatF image_points, 
 
     return X;
     //MatF rotated = (model_points + Ax) * R;
+}
+
+MatF MMSolver::SolveShapePerspective1(ProjectionParameters p, MatF image_points, MatF M, MatF SB, VectorXf rv)
+{
+    MatF rotated = Transform(p, M);//Nx3
+    MatF zs=rotated.col(2);
+    MatF xs=rotated.col(0);
+    xs*=fx;
+    MatF ys=rotated.col(1);
+    ys*=fx;
+    MatF imageXs=image_points.col(0);
+    imageXs=imageXs.array()*zs.array();
+    MatF imageYs=image_points.col(1);
+    imageYs=imageYs.array()*zs.array();
+    MatF errXs=imageXs-xs;
+    MatF errYs=imageYs-ys;
+    MatF error = MatF::Zero(image_points.rows(),image_points.cols());
+    error.col(0)=errXs;
+    error.col(1)=errYs;
+    error = Reshape(error, 1);
+
+    int N = M.rows();
+    int N2 = SB.rows();
+    int L = SB.cols();
+
+    assert(N2 == N * 3);
+    auto sTx = p.tx * p.s;
+    auto sTy = p.ty * p.s;
+    MatF SBX(N * 2, L);
+    for (size_t i = 0; i < N; i++)
+    {
+        MatF SBRotation= p.R * SB.block(i * 3, 0, 3, L);//3xL
+        MatF xs=SBRotation.row(0);//1xL
+        MatF ys=SBRotation.row(1);//1xL
+        float zc=rotated(i,2);
+        xs*=fx;
+        ys*=fx;
+        SBX.block(i * 2, 0, 1, L)=xs;
+        SBX.block(i * 2+1, 0, 1, L)=ys;
+        /*SBX.row(i * 2) .array()= sTx;
+        SBX.row(i * 2+1).array() = sTy;*/
+    }
+
+    if (USEWEIGHT)
+    {
+        Matrix<float, Eigen::Dynamic, 1> W = Matrix<float, Eigen::Dynamic, 1>::Ones(2 * N, 1);
+        for (size_t i = 0; i < SkipList.size(); i++)
+        {
+            W(2 * SkipList[i] + 0, 0) = WEIGHT;
+            W(2 * SkipList[i] + 1, 0) = WEIGHT;
+        }
+        SBX = W.asDiagonal() * SBX;
+        error = W.asDiagonal() * error;
+    }
+
+    auto X = SolveLinear(SBX/fx, error/fx, rv);
+
+    return X;
 }
 MatF MMSolver::SolveShape(ProjectionParameters p, MatF image_points, MatF M, MatF SB, float lambda)
 {
@@ -341,8 +402,8 @@ ProjectionParameters MMSolver::SolveProjection(MatF image_points, MatF model_poi
 
     Eigen::Matrix3f R_ortho = Orthogonalize(R);
 
-//    std::cout << "R:" << R << std::endl;
-//    std::cout << "R_ortho:" << R_ortho << std::endl;
+    //    std::cout << "R:" << R << std::endl;
+    //    std::cout << "R_ortho:" << R_ortho << std::endl;
     MatF T = Mean * R_ortho.transpose();
     // Remove the scale from the translations:
     auto t1 = sTx / s - T(0);
@@ -350,12 +411,12 @@ ProjectionParameters MMSolver::SolveProjection(MatF image_points, MatF model_poi
 
     auto error = (A*k - b).norm();
 
-//    std::cout << "TTS:" << t1 << " " << t2 << " " << s << std::endl;
-//    std::cout << "error:" << error << std::endl;
+    //    std::cout << "TTS:" << t1 << " " << t2 << " " << s << std::endl;
+    //    std::cout << "error:" << error << std::endl;
 
     return ProjectionParameters{ R_ortho, t1, t2,0, s };
 }
-void MMSolver::Solve(MatF KP)
+void MMSolver::Solve(MatF& KP)
 {
     MatF Face = FM.Face;
     MatF S = Face * 0;
@@ -395,7 +456,7 @@ void MMSolver::Solve(MatF KP)
     }
 
 }
-void MMSolver::SolvePerspective(MatF KP)
+void MMSolver::SolvePerspective(MatF& KP)
 {
     MatF Face = FM.Face;
     MatF S = Face * 0;
@@ -424,11 +485,50 @@ void MMSolver::SolvePerspective(MatF KP)
         Face = FM.Face + S + E;
 
     }
-//    std::cout << "SX:" << SX << std::endl;
-//    std::cout << "EX:" << EX << std::endl;
+    //    std::cout << "SX:" << SX << std::endl;
+    //    std::cout << "EX:" << EX << std::endl;
 
 }
-void MMSolver::SolvePerspective2(MatF KP)
+void MMSolver::SolvePerspective1(MatF& KP,VectorXf rsv,VectorXf rev)
+{
+    MatF Face = FM.Face;
+    MatF S = Face * 0;
+    MatF E = Face * 0;
+    //    float Lambdas[7] = { 100.0, 30.0, 10.0, 5.0,4.0,3.0,2.0};
+    float lambdaSX[4]={100,20.0,2.0,1.0f};
+    float lambdaEX[4]={1.0,0.2,0.04,0.02f};
+    params.tx=0;
+    params.ty=0;
+    params.tz=450;
+    for (size_t i = 0; i < 4; i++)
+    {
+        params = SolveProjectionNonlinear(KP, Face);
+        if (FixShape)
+        {
+            SX = SX0;
+        }
+        else
+        {
+            //            SX = SolveShapePerspective(params, KP, FM.Face + E, FM.SB, Lambdas[i]*5);
+            SX = SolveShapePerspective1(params, KP, FM.Face + E, FM.SB, lambdaSX[i]*rsv);
+            if (FIXFIRSTSHAPE)
+            {
+                SX(0, 0) = 0;
+            }
+        }
+        MatF FaceS = FM.SB * SX;
+        S = Reshape(FaceS, 3);
+        EX = SolveShapePerspective1(params, KP, FM.Face + S, FM.EB,lambdaEX[i]*rev);
+        MatF FaceE = FM.EB * EX;
+        E = Reshape(FaceE, 3);
+        Face = FM.Face + S + E;
+
+    }
+    //    std::cout << "SX:" << SX << std::endl;
+    //    std::cout << "EX:" << EX << std::endl;
+
+}
+void MMSolver::SolvePerspective2(MatF& KP)
 {
     using namespace fitting;
     int N = KP.rows();
@@ -457,8 +557,8 @@ void MMSolver::SolvePerspective2(MatF KP)
     problem.SetParameterLowerBound(&translation[0],2,100);
     problem.SetParameterUpperBound(&translation[0],2,2000);
 
-//    problem.SetParameterBlockConstant(&shape_coefficients[0]);
-//    problem.SetParameterBlockConstant(&blendshape_coefficients[0]);
+    //    problem.SetParameterBlockConstant(&shape_coefficients[0]);
+    //    problem.SetParameterBlockConstant(&blendshape_coefficients[0]);
     ceres::QuaternionParameterization* cameraFitQuaternionParameterisation = new ceres::QuaternionParameterization();
     problem.SetParameterization(&cameraRotation[0], cameraFitQuaternionParameterisation);
     ceres::Solver::Options solverOptions;
@@ -466,17 +566,17 @@ void MMSolver::SolvePerspective2(MatF KP)
     solverOptions.num_threads = 1;
     solverOptions.minimizer_progress_to_stdout = true;
     ceres::Solver::Summary solverSummary;
-//    ceres::Solve(solverOptions, &problem, &solverSummary);
+    //    ceres::Solve(solverOptions, &problem, &solverSummary);
     //std::cout << solverSummary.BriefReport() << "\n";
     //---------------------------------
-//    problem.SetParameterBlockVariable(&shape_coefficients[0]);
-//    problem.SetParameterBlockVariable(&blendshape_coefficients[0]);
+    //    problem.SetParameterBlockVariable(&shape_coefficients[0]);
+    //    problem.SetParameterBlockVariable(&blendshape_coefficients[0]);
     problem.SetParameterLowerBound(&shape_coefficients[0],0,-1500);
     problem.SetParameterUpperBound(&shape_coefficients[0],0,1500);
     problem.SetParameterLowerBound(&blendshape_coefficients[0],0,-1000);
     problem.SetParameterUpperBound(&blendshape_coefficients[0],0,1000);
     //        fitting::PriorCost *shapePrior=new fitting::PriorCost(num_coeffs_fitting, fx*100);
-    fitting::PriorCost2 *shapePrior=new fitting::PriorCost2(num_coeffs_fitting,0.002f);
+    fitting::PriorCost2 *shapePrior=new fitting::PriorCost2(num_coeffs_fitting,0.0015f);
     shapePrior->variance=FMFull.SV;
     ceres::CostFunction* shapePriorCost =
             new ceres::AutoDiffCostFunction<fitting::PriorCost2, num_coeffs_fitting /* num residuals */,
@@ -484,7 +584,7 @@ void MMSolver::SolvePerspective2(MatF KP)
                 shapePrior);
     problem.AddResidualBlock(shapePriorCost,/* new ceres::CauchyLoss(0.5)*/NULL, &shape_coefficients[0]);
 
-    fitting::PriorCost2 *blendShapePrior=new fitting::PriorCost2(num_blendshapes,0.001f);
+    fitting::PriorCost2 *blendShapePrior=new fitting::PriorCost2(num_blendshapes,0.0003f);
     blendShapePrior->variance=FMFull.EV;
     ceres::CostFunction* blendshapesPriorCost =
             new ceres::AutoDiffCostFunction<fitting::PriorCost2, num_blendshapes /* num residuals */,
@@ -499,8 +599,8 @@ void MMSolver::SolvePerspective2(MatF KP)
     Eigen::Quaternion<double> qd(cameraRotation[0],cameraRotation[1],cameraRotation[2],cameraRotation[3]);
     Eigen::Matrix<double, 3, 1> t(translation[0],translation[1],translation[2]);
     Eigen::Matrix<double,3,3> Rotation=qd.toRotationMatrix();
-//    std::cout << "Rotation:" << Rotation << std::endl;
-//    std::cout << "t:" << t << std::endl;
+    //    std::cout << "Rotation:" << Rotation << std::endl;
+    //    std::cout << "t:" << t << std::endl;
     Eigen::Matrix<float,3,3> Rf=Rotation.cast<float>();
     Eigen::Matrix<float,3,1> tf=t.cast<float>();
     params.R=Rf;

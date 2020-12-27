@@ -45,7 +45,7 @@ public:
 
     }
     void Initialize(string file, bool LoadEdge,bool LoadColor=false);
-    MatF Generate(MatF SX, MatF EX);
+    MatF &Generate(MatF SX, MatF EX);
 };
 
 #endif // FACEMODEL_H

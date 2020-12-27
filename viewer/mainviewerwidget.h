@@ -22,6 +22,7 @@ protected:
 public slots:
     void Open(void);
     void ReadVideo(void);
+    void PauseOrResumeVideo();
     void Save(void);
     void ClearMesh(void);
     void Screenshot(void);
@@ -43,6 +44,7 @@ public slots:
 
 signals:
     void haveLoadMesh(QString filePath);
+    void havePauseOrResume(bool pause);
 protected:
     bool loadmeshsuccess;
 private:

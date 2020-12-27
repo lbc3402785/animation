@@ -14,7 +14,7 @@ INCLUDEPATH+="C:\Program Files (x86)\Ceres\include" \
                  "C:\Program Files (x86)\glog\include" \
                  "C:\Program Files (x86)\gflags\include"
 
-LIBS+=-L$$OPENCV_LIBRARY_DIRS -lopencv_world344
+LIBS+=-L$$OPENCV_LIBRARY_DIRS -lopencv_world344 -lopencv_face344
 LIBS +=-L$$OPENMESH_LIBRARY_DIRS -lOpenMeshCore
 LIBS+=-L$$(DLIB_ROOT)\lib -ldlib19.16.99_release_64bit_msvc1900
 
@@ -22,6 +22,8 @@ LIBS+=-L"C:\Program Files (x86)\Ceres\lib" -lceres
 LIBS+=-L"C:\Program Files (x86)\glog\lib" -lglog
 LIBS+=-L"C:\Program Files (x86)\gflags\lib" -lgflags
 HEADERS += \
+    $$PWD/drawLandmarks.hpp \
+    $$PWD/renderFace.hpp \
     ../modelsequence.h \
     ../MeshDefinition.h \
     ../common/imageprocess.h \

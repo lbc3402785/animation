@@ -25,11 +25,17 @@ void SurfaceMeshProcessing::CreateActions(void)
 	actOpen->setStatusTip(tr("Open a mesh file"));
 	connect(actOpen, SIGNAL(triggered()), viewer, SLOT(Open()));
 
-    actOpenDir = new QAction(tr("&ReadVideo"), this);
-	actOpenDir->setIcon(QIcon(":/SurfaceMeshProcessing/Images/Open.png"));
-	actOpenDir->setShortcut(QKeySequence::Open);
-	actOpenDir->setStatusTip(tr("Open a mesh file dir"));
-    connect(actOpenDir, SIGNAL(triggered()), viewer, SLOT(ReadVideo()));
+    actOpenVideo = new QAction(tr("&ReadVideo"), this);
+    actOpenVideo->setIcon(QIcon(":/SurfaceMeshProcessing/Images/Open.png"));
+    actOpenVideo->setShortcut(QKeySequence::Open);
+    actOpenVideo->setStatusTip(tr("Open a videor"));
+    connect(actOpenVideo, SIGNAL(triggered()), viewer, SLOT(ReadVideo()));
+
+    actPauseOrResumeVideo= new QAction(tr("&Pause/Resume"), this);
+    actPauseOrResumeVideo->setIcon(QIcon(":/SurfaceMeshProcessing/Images/pause.jpg"));
+    actPauseOrResumeVideo->setShortcut(QKeySequence::Open);
+    actPauseOrResumeVideo->setStatusTip(tr("Pause or Resume videor"));
+    connect(actPauseOrResumeVideo, SIGNAL(triggered()), viewer, SLOT(PauseOrResumeVideo()));
 
 	actSave = new QAction(tr("&Save"), this);
 	actSave->setIcon(QIcon(":/SurfaceMeshProcessing/Images/Save.png"));
@@ -146,7 +152,7 @@ void SurfaceMeshProcessing::CreateMenus(void)
 {
 	QMenu *menuFile = menuBar()->addMenu(tr("&File"));
 	menuFile->addAction(actOpen);
-	menuFile->addAction(actOpenDir);
+    menuFile->addAction(actOpenVideo);
 	menuFile->addAction(actSave);
 	menuFile->addAction(actClearMesh);
 	menuFile->addSeparator()->setEnabled(false);
@@ -183,6 +189,8 @@ void SurfaceMeshProcessing::CreateToolBars(void)
 {
 	QToolBar *tbStandard = addToolBar(tr("Standard"));
 	tbStandard->addAction(actOpen);
+    tbStandard->addAction(actOpenVideo);
+    tbStandard->addAction(actPauseOrResumeVideo);
 	tbStandard->addAction(actSave);
 	tbStandard->addAction(actClearMesh);
 	tbStandard->addSeparator()->setEnabled(false);
@@ -205,6 +213,7 @@ void SurfaceMeshProcessing::CreateToolBars(void)
 void SurfaceMeshProcessing::CreateStatusBar(void)
 {
 	connect(viewer, SIGNAL(haveLoadMesh(QString)), statusBar(), SLOT(showMessage(QString)));
+    connect(viewer, SIGNAL(havePauseOrResume(bool)), this, SLOT(changePauseIcon(bool)));
 }
 
 void SurfaceMeshProcessing::About(void)
@@ -214,5 +223,14 @@ void SurfaceMeshProcessing::About(void)
 		"<div>Copyright &#169; 2019 Shuangming Chai</div>"
 		"<div>This program can load and process surface meshes.</div>"
 		"<div>If you have any problems, feel free to send emails to "
-		"<a href=\"mailto:kfckfckf@mail.ustc.edu.cn\">kfckfckf@mail.ustc.edu.cn</a></div>");
+        "<a href=\"mailto:kfckfckf@mail.ustc.edu.cn\">kfckfckf@mail.ustc.edu.cn</a></div>");
+}
+
+void SurfaceMeshProcessing::changePauseIcon(bool pause)
+{
+    if(pause){
+        actPauseOrResumeVideo->setIcon(QIcon(":/SurfaceMeshProcessing/Images/play.jpg"));
+    }else{
+        actPauseOrResumeVideo->setIcon(QIcon(":/SurfaceMeshProcessing/Images/pause.jpg"));
+    }
 }

@@ -13,5 +13,7 @@
         <file>Images/saveScreen.png</file>
         <file>Images/smooth.png</file>
         <file>Images/wire.png</file>
+        <file>Images/pause.jpg</file>
+        <file>Images/play.jpg</file>
     </qresource>
 </RCC>

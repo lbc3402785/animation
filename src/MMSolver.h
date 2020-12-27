@@ -177,20 +177,21 @@ public:
     MatF SX;
     MatF EX;
     ProjectionParameters params;
-
     bool FixShape = false;
     MatF SX0;
-    MatF Transform(ProjectionParameters p, MatF model_points);
-    MatF PerspectiveProjection(ProjectionParameters p, MatF model_points);
+    MatF Transform(ProjectionParameters& p, MatF model_points);
+    MatF PerspectiveProjection(ProjectionParameters& p, MatF& model_points);
     MatF SolveShapePerspective(ProjectionParameters p, MatF image_points, MatF M, MatF SB, float lambda);
+    MatF SolveShapePerspective1(ProjectionParameters p, MatF image_points, MatF M, MatF SB, VectorXf rv);
     MatF SolveShape(ProjectionParameters p, MatF image_points, MatF M, MatF SB, float lambda);
     MatF SolveShape2(ProjectionParameters p, MatF pre, MatF cur, MatF SB, float lambda);
     MatF SolveShape3(ProjectionParameters p, MatF pre, MatF cur, MatF SB, VectorXf variance);
     ProjectionParameters SolveProjectionNonlinear(MatF image_points, MatF model_points);
     ProjectionParameters SolveProjection(MatF image_points, MatF model_points);
-    void Solve(MatF KP);
-    void SolvePerspective(MatF KP);
-    void SolvePerspective2(MatF KP);
+    void Solve(MatF& KP);
+    void SolvePerspective(MatF& KP);
+    void SolvePerspective1(MatF& KP,VectorXf rsv,VectorXf rev);
+    void SolvePerspective2(MatF& KP);
 };
 
 

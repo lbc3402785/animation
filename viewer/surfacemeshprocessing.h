@@ -18,11 +18,13 @@ private:
 
 	private slots:
 	void About(void);
+    void changePauseIcon(bool pause);
 
 private:
 	// File Actions.
 	QAction *actOpen;
-	QAction *actOpenDir;
+    QAction *actOpenVideo;
+    QAction *actPauseOrResumeVideo;
 	QAction *actSave;
 	QAction *actClearMesh;
 	QAction *actScreenshot;
