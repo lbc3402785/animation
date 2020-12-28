@@ -11,14 +11,17 @@
 #include <QTime>
 #include "modelsequence.h"
 #include "thread/modelthread.h"
+#include "settings.h"
 class MeshViewerWidget : public QGLViewerWidget
 {
     Q_OBJECT
 public:
+    Settings& sets=Settings::instance();
     QTime time;
     std::shared_ptr<ModelSequence> modelPtr;
     ModelThread* modelThread;
     bool isUpdate = false;
+    bool stop;
     bool pause=false;
     int timerId;
     int headOffset = 46398;
@@ -29,12 +32,13 @@ public:
     cv::Mat pic;
     VideoCapture sequence;
     int count;
-    int cur; 
+    int cur;
     MeshViewerWidget(QWidget* parent = 0);
     virtual ~MeshViewerWidget(void);
     bool LoadMesh(const std::string & filename);
     void ReadVideo(const std::string & dir);
     void PauseOrResumeVideo();
+    void Stop();
     void Clear(void);
     void UpdateMesh(void);
     bool SaveMesh(const std::string & filename);
@@ -47,11 +51,12 @@ public:
     void ViewCenter(void);
     void CopyRotation(void);
     void LoadRotation(void);
-
+    virtual void closeWorkingThread(ModelThread** t);
 signals:
     void LoadMeshOKSignal(bool, QString);
 public slots:
     void PrintMeshInfo(void);
+    void readImage();
     void play();
 protected:
     virtual void DrawScene(void) override;
@@ -60,7 +65,6 @@ protected:
     void timerEvent(QTimerEvent *);
 private:
     QTimer* timer;
-    bool first;
     cv::Mat image;
 
     float* pointData;

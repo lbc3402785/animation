@@ -37,6 +37,13 @@ void SurfaceMeshProcessing::CreateActions(void)
     actPauseOrResumeVideo->setStatusTip(tr("Pause or Resume videor"));
     connect(actPauseOrResumeVideo, SIGNAL(triggered()), viewer, SLOT(PauseOrResumeVideo()));
 
+    actStop= new QAction(tr("&Stop"), this);
+    actStop->setIcon(QIcon(":/SurfaceMeshProcessing/Images/stop.jpg"));
+    actStop->setShortcut(QKeySequence::Close);
+    actStop->setStatusTip(tr("Stop video"));
+    connect(actStop, SIGNAL(triggered()), viewer, SLOT(Stop()));
+    actStop->setDisabled(true);
+
 	actSave = new QAction(tr("&Save"), this);
 	actSave->setIcon(QIcon(":/SurfaceMeshProcessing/Images/Save.png"));
 	actSave->setShortcut(QKeySequence::Save);
@@ -191,6 +198,7 @@ void SurfaceMeshProcessing::CreateToolBars(void)
 	tbStandard->addAction(actOpen);
     tbStandard->addAction(actOpenVideo);
     tbStandard->addAction(actPauseOrResumeVideo);
+    tbStandard->addAction(actStop);
 	tbStandard->addAction(actSave);
 	tbStandard->addAction(actClearMesh);
 	tbStandard->addSeparator()->setEnabled(false);
@@ -214,6 +222,7 @@ void SurfaceMeshProcessing::CreateStatusBar(void)
 {
 	connect(viewer, SIGNAL(haveLoadMesh(QString)), statusBar(), SLOT(showMessage(QString)));
     connect(viewer, SIGNAL(havePauseOrResume(bool)), this, SLOT(changePauseIcon(bool)));
+    connect(viewer, SIGNAL(havePlay(bool)), this, SLOT(changeStopButton(bool)));
 }
 
 void SurfaceMeshProcessing::About(void)
@@ -232,5 +241,14 @@ void SurfaceMeshProcessing::changePauseIcon(bool pause)
         actPauseOrResumeVideo->setIcon(QIcon(":/SurfaceMeshProcessing/Images/play.jpg"));
     }else{
         actPauseOrResumeVideo->setIcon(QIcon(":/SurfaceMeshProcessing/Images/pause.jpg"));
+    }
+}
+
+void SurfaceMeshProcessing::changeStopButton(bool stop)
+{
+    if(!stop){
+        actStop->setEnabled(true);
+    }else{
+        actStop->setDisabled(true);
     }
 }

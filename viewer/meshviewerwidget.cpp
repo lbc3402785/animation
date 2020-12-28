@@ -27,7 +27,7 @@ MeshViewerWidget::MeshViewerWidget(QWidget* parent)
     imageQueue=std::shared_ptr<ThreadSafeQueue<cv::Mat>>(new ThreadSafeQueue<cv::Mat>());
     resultQueue=std::shared_ptr<ThreadSafeQueue< std::tuple<MatF,MatF,cv::Mat> > >
             (new ThreadSafeQueue< std::tuple<MatF,MatF,cv::Mat> > ());
-
+    stop=false;
 }
 
 MeshViewerWidget::~MeshViewerWidget(void)
@@ -120,6 +120,7 @@ bool MeshViewerWidget::LoadMesh(const std::string & filename)
 
 void MeshViewerWidget::ReadVideo(const std::string &videoPath)
 {
+    stop=false;
     if(!isReaded){
         mesh.clear();
         makeMesh(modelPtr->solver.FMFull.Face,modelPtr->solver.FMFull.TRI);
@@ -155,18 +156,21 @@ void MeshViewerWidget::ReadVideo(const std::string &videoPath)
     }
     count=sequence.get(CAP_PROP_FRAME_COUNT);
     cur=0;
-    first=true;
     int fps=sequence.get(CAP_PROP_FPS);
     std::cout<<"fps:"<<fps<<std::endl;
     timer = new QTimer(this);
-    connect(timer, SIGNAL(timeout()), this, SLOT(play()));
+    connect(timer, SIGNAL(timeout()), this, SLOT(readImage()));
     timer->start((1000/fps));
     time.start();
-
+    modelPtr->solver.SX*=0;
+    modelPtr->solver.EX*=0;
     if(!modelThread){
         modelThread=new ModelThread(modelPtr,imageQueue,resultQueue,this);
+        connect(modelThread,&ModelThread::returnData,this,&MeshViewerWidget::play);
         modelThread->start();
     }
+    modelThread->setFirst(true);
+
     //namedWindow("video",CV_WINDOW_AUTOSIZE|CV_GUI_EXPANDED|CV_WINDOW_KEEPRATIO);
 }
 
@@ -176,27 +180,33 @@ void MeshViewerWidget::PauseOrResumeVideo()
     if(modelThread)modelThread->setPause(pause);
 }
 
-void MeshViewerWidget::play()
+void MeshViewerWidget::Stop()
 {
-    if(pause)return;
-
-    if(resultQueue->TryPop(result)){
-        MatF model, uv;
-        Mat faceTexture;
-        std::tie(model,uv,faceTexture)=result;
-        memcpy(pointData,model.data(),sizeof(float)*3*mesh.n_vertices());
-        memcpy(uvData,uv.data(),sizeof(float)*2*mesh.n_vertices());
-        QImage face=MatConvertQImage::Mat2QImage(faceTexture);
-        if(textures[0]){
-            delete textures[0];
-        }
-        textures[0] = new QOpenGLTexture(face);
-        textures[0]->setMinificationFilter(QOpenGLTexture::Nearest);
-        textures[0]->setMagnificationFilter(QOpenGLTexture::Linear);
-        textures[0]->setWrapMode(QOpenGLTexture::Repeat);
-        update();
-
+    stop=true;
+    if(modelThread){
+        //std::lock_guard<std::mutex> lock(sets.obj.modelTheadMutex);
+        closeWorkingThread(&modelThread);
+        Clear();
     }
+}
+void MeshViewerWidget::closeWorkingThread(ModelThread **t)
+{
+    (*t)->setStopSignal(true);
+    (*t)->requestInterruption();
+   // QThread::msleep(1);
+    //(*t)->quit();
+    //(*t)->requestInterruption();
+    //(*t)->wait();
+    //(*t)->deleteLater();
+    (*t)=nullptr;
+}
+void MeshViewerWidget::readImage()
+{
+    if(stop){
+        timer->stop();
+        return;
+    }
+    if(pause)return;
     if(cur<count-1){
         sequence >> image;
         if(image.empty()){
@@ -218,9 +228,36 @@ void MeshViewerWidget::play()
         destroyWindow("video");
     }
 }
+
+void MeshViewerWidget::play()
+{
+    if(resultQueue->TryPop(result)){
+        MatF model, uv;
+        Mat faceTexture;
+        std::tie(model,uv,faceTexture)=result;
+        memcpy(pointData,model.data(),sizeof(float)*3*mesh.n_vertices());
+        memcpy(uvData,uv.data(),sizeof(float)*2*mesh.n_vertices());
+        QImage face=MatConvertQImage::Mat2QImage(faceTexture);
+        if(textures[0]){
+            delete textures[0];
+        }
+        textures[0] = new QOpenGLTexture(face);
+        textures[0]->setMinificationFilter(QOpenGLTexture::Nearest);
+        textures[0]->setMagnificationFilter(QOpenGLTexture::Linear);
+        textures[0]->setWrapMode(QOpenGLTexture::Repeat);
+        update();
+
+    }
+}
 void MeshViewerWidget::Clear(void)
 {
     mesh.clear();
+    isReaded=false;
+    pointData=nullptr;
+    uvData=nullptr;
+    if(imageQueue)imageQueue->clear();
+    if(resultQueue)resultQueue->clear();
+    update();
 }
 
 void MeshViewerWidget::UpdateMesh(void)

@@ -34,6 +34,7 @@ HEADERS += \
         meshparamwidget.h \
         meshviewerwidget.h \
         qglviewerwidget.h \
+        settings.h \
         surfacemeshprocessing.h \
         thread/modelthread.h \
         thread/threadsafequeue.h \
@@ -46,6 +47,7 @@ SOURCES += \
     meshparamwidget.cpp \
     meshviewerwidget.cpp \
     qglviewerwidget.cpp \
+    settings.cpp \
     surfacemeshprocessing.cpp \
     main.cpp \
     thread/modelthread.cpp \

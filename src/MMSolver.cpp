@@ -497,9 +497,6 @@ void MMSolver::SolvePerspective1(MatF& KP,VectorXf rsv,VectorXf rev)
     //    float Lambdas[7] = { 100.0, 30.0, 10.0, 5.0,4.0,3.0,2.0};
     float lambdaSX[4]={100,20.0,2.0,1.0f};
     float lambdaEX[4]={1.0,0.2,0.04,0.02f};
-    params.tx=0;
-    params.ty=0;
-    params.tz=450;
     for (size_t i = 0; i < 4; i++)
     {
         params = SolveProjectionNonlinear(KP, Face);

@@ -4,10 +4,12 @@
 #include "workingthread.h"
 #include "modelsequence.h"
 #include "threadsafequeue.h"
+#include "settings.h"
 class ModelThread:public WorkingThread
 {
     Q_OBJECT
 public:
+    Settings& sets=Settings::instance();
     ModelThread(std::shared_ptr<ModelSequence>& solverPtr,std::shared_ptr<ThreadSafeQueue<cv::Mat>> &imageQueue,
                 std::shared_ptr<ThreadSafeQueue< std::tuple<MatF,MatF,cv::Mat> > >&resultQueue,QObject *parent = nullptr);
     bool getFirst() const;
@@ -23,7 +25,8 @@ private:
     std::shared_ptr<ModelSequence> solverPtr;
     std::shared_ptr<ThreadSafeQueue<cv::Mat>> imageQueue;
     std::shared_ptr<ThreadSafeQueue< std::tuple<MatF,MatF,cv::Mat> > > resultQueue;
-
+signals:
+    void returnData();
     // QThread interface
 protected:
     void run();

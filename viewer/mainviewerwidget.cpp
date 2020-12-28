@@ -55,6 +55,7 @@ void MainViewerWidget::OpenVideoGUI(const QString &fname)
         QMessageBox::critical(NULL, windowTitle(), msg);
     }else{
         meshviewerwidget->ReadVideo(fname.toStdString());
+        emit(havePlay(meshviewerwidget->stop));
     }
 }
 
@@ -102,6 +103,11 @@ void MainViewerWidget::PauseOrResumeVideo()
 {
     meshviewerwidget->PauseOrResumeVideo();
     emit(havePauseOrResume(meshviewerwidget->pause));
+}
+
+void MainViewerWidget::Stop()
+{
+    meshviewerwidget->Stop();
 }
 
 void MainViewerWidget::Save(void)

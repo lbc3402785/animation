@@ -15,5 +15,6 @@
         <file>Images/wire.png</file>
         <file>Images/pause.jpg</file>
         <file>Images/play.jpg</file>
+        <file>Images/stop.jpg</file>
     </qresource>
 </RCC>

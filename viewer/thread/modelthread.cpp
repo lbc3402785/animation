@@ -15,16 +15,20 @@ void ModelThread::run()
 {
     state=RUNNING;
     while (!stopSignal) {
-        if (isInterruptionRequested())
-            return;
+        if (isInterruptionRequested()){
+            std::cout<<"isInterruptionRequested"<<std::endl;
+            break;
+        }
         if(pause){
             msleep(interval*2);
         }else{
+            //std::lock_guard<std::mutex> lock(sets.obj.modelTheadMutex);//lock
             imageQueue->WaitAndPop(image);
             std::deque<std::tuple<MatF,MatF,cv::Mat>>& results=solverPtr->readOnePic(image,first,false);
             while(!results.empty()){
                 resultQueue->TryPush(results.front());
                 results.pop_front();
+                emit(returnData());
             }
             msleep(interval);
         }

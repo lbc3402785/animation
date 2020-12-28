@@ -86,7 +86,12 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
         return queue_.empty();
     }
-
+    void clear(){
+        std::lock_guard<std::mutex> lock(mutex_);
+        while(!queue_.empty()){
+            queue_.pop();
+        }
+    }
 private:
     ThreadSafeQueue(const ThreadSafeQueue&) = delete;
     ThreadSafeQueue& operator=(const ThreadSafeQueue&) = delete;

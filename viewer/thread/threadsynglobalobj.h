@@ -6,8 +6,7 @@ class ThreadSynGlobalObj
 {
 public:
     ThreadSynGlobalObj();
-    mutable  std::mutex cameraTheadMutex;
-    mutable  std::mutex udpTheadMutex;
+    mutable  std::mutex modelTheadMutex;
 };
 
 #endif // THREADSYNGLOBALOBJ_H

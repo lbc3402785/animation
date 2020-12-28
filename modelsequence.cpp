@@ -337,7 +337,9 @@ std::deque<std::tuple<MatF,MatF,cv::Mat>>& ModelSequence::readOnePic(Mat& image,
             solver.params.ty=500;
             //solver.SolvePerspective2(KP);
             solver.SolvePerspective1(KP,rsv,rev);
-            firstLoc<<solver.params.tx,solver.params.ty,solver.params.tz;
+            firstLoc(0)=solver.params.tx;
+            firstLoc(1)=solver.params.ty;
+            firstLoc(2)=solver.params.tz;
             solver.FM.Generate(solver.SX, solver.EX*0);
             shapeKey3D=solver.Transform(solver.params,solver.FM.GeneratedFace);
             solver.FMFull.Generate(solver.SX, solver.EX);
