@@ -1,7 +1,6 @@
 #ifndef WORKINGTHREAD_H
 #define WORKINGTHREAD_H
 #include <QThread>
-#include "settings.h"
 class WorkingThread : public QThread
 {
     Q_OBJECT
@@ -16,7 +15,7 @@ public:
 
 protected:
     bool stopSignal;
-    Settings& sets=Settings::instance();
+//    Settings& sets=Settings::instance();
     WorkingState state;
 };
 

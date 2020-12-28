@@ -53,6 +53,7 @@ private:
     MatF computeKey3D(MatF& lastKey3D,MatF& lastKey2D,MatF& KP,float fx);
     int H;
     int W;
+    std::deque<std::tuple<MatF,MatF,cv::Mat>> results;
 public:
     void draw(cv::Mat& input);
     bool center=true;
@@ -67,7 +68,7 @@ public:
     bool Init(std::string npzPath,std::string dlibPath,std::string facePath,std::string headPath,string bodyPath,std::string maskPath,std::string keyFilePath);
     std::tuple<MatF,MatF,cv::Mat> output(cv::Mat&input,std::string name,bool first=false,bool save=true);
     void readVideo(std::string videoPath);
-    std::tuple<std::deque<MatF>,std::deque<MatF>,std::deque<cv::Mat>> readOnePic(cv::Mat& input,bool& first,bool save=false);
+    std::deque<std::tuple<MatF,MatF,cv::Mat>>& readOnePic(cv::Mat& input,bool& first,bool save=false);
     int getH() const;
     void setH(int value);
     int getW() const;

@@ -6,7 +6,6 @@
 #include <cmath>
 #include <opencv2/opencv.hpp>
 #include <opencv2/face.hpp>
-#include "drawLandmarks.hpp"
 Test::Test()
 {
 
@@ -91,59 +90,3 @@ void Test::testGenerateModel()
     //    cout << "R:" << endl << R << endl;
 }
 
-void Test::testOpencvLandMarkDetection()
-{
-    // Load Face Detector
-    CascadeClassifier faceDetector("haarcascade_frontalface_alt2.xml");
-
-    // Create an instance of Facemark
-    Ptr<cv::face::Facemark> facemark = cv::face::FacemarkLBF::create();
-
-    // Load landmark detector
-    facemark->loadModel("lbfmodel.yaml");
-
-    // Set up webcam for video capture
-    VideoCapture cam("F:\\Data\\video\\VID_20200324_181719.mp4");
-
-    // Variable to store a video frame and its grayscale
-    Mat frame, gray;
-
-    // Read a frame
-    while(cam.read(frame))
-    {
-        QTime time;
-        time.start();
-        // Find face
-        vector<Rect> faces;
-        // Convert frame to grayscale because
-        // faceDetector requires grayscale image.
-        cv::resize(frame,frame,cv::Size(),0.25,0.25);
-        cvtColor(frame, gray, COLOR_BGR2GRAY);
-        // Detect faces
-        faceDetector.detectMultiScale(gray, faces);
-
-        // Variable for landmarks.
-        // Landmarks for one face is a vector of points
-        // There can be more than one face in the image. Hence, we
-        // use a vector of vector of points.
-        vector< vector<Point2f> > landmarks;
-
-        // Run landmark detector
-        bool success = facemark->fit(frame,faces,landmarks);
-        std::cout<<"cost:"<<time.elapsed()<<std::endl;
-        if(success)
-        {
-            // If successful, render the landmarks on the face
-            for(int i = 0; i < landmarks.size(); i++)
-            {
-                drawLandmarks(frame, landmarks[i]);
-            }
-        }
-
-        // Display results
-        imshow("Facial Landmark Detection", frame);
-        // Exit loop if ESC is pressed
-        if (waitKey(1) == 27) break;
-
-    }
-}

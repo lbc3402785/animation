@@ -6,6 +6,5 @@ int main(int argc, char *argv[])
 
 //    return a.exec();
 //    Test::testGenerateModel();
-        Test::testOpencvLandMarkDetection();
     return 0;
 }

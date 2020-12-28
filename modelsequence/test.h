@@ -7,7 +7,6 @@ class Test
 public:
     Test();
     static void testGenerateModel();
-    static void testOpencvLandMarkDetection();
 };
 
 #endif // TEST_H

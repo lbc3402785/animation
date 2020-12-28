@@ -13,8 +13,8 @@ MeshViewerWidget::MeshViewerWidget(QWidget* parent)
 {
     //timerId = startTimer(50);
     ModelSequence model;
-//    model.setH(2048);
-//    model.setW(2048);
+    //    model.setH(2048);
+    //    model.setW(2048);
     model.Init("..\\modelsequence\\data\\WomenFullHead1216.npz","..\\modelsequence\\data\\shape_predictor_68_face_landmarks.dat",
                "..\\modelsequence\\data\\WomanFace.png","..\\modelsequence\\data\\WomanHead.jpg","",
                "..\\modelsequence\\data\\WomanMask1.png","..\\modelsequence\\data\\women.ini");
@@ -23,6 +23,11 @@ MeshViewerWidget::MeshViewerWidget(QWidget* parent)
     headTriOffset=modelPtr->solver.FMFull.TRIUV_FACE.rows();
     Clear();
     isReaded=false;
+    modelThread=nullptr;
+    imageQueue=std::shared_ptr<ThreadSafeQueue<cv::Mat>>(new ThreadSafeQueue<cv::Mat>());
+    resultQueue=std::shared_ptr<ThreadSafeQueue< std::tuple<MatF,MatF,cv::Mat> > >
+            (new ThreadSafeQueue< std::tuple<MatF,MatF,cv::Mat> > ());
+
 }
 
 MeshViewerWidget::~MeshViewerWidget(void)
@@ -155,27 +160,30 @@ void MeshViewerWidget::ReadVideo(const std::string &videoPath)
     std::cout<<"fps:"<<fps<<std::endl;
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(play()));
-     timer->start((1000/fps));
-         time.start();
+    timer->start((1000/fps));
+    time.start();
 
-     //namedWindow("video",CV_WINDOW_AUTOSIZE|CV_GUI_EXPANDED|CV_WINDOW_KEEPRATIO);
+    if(!modelThread){
+        modelThread=new ModelThread(modelPtr,imageQueue,resultQueue,this);
+        modelThread->start();
+    }
+    //namedWindow("video",CV_WINDOW_AUTOSIZE|CV_GUI_EXPANDED|CV_WINDOW_KEEPRATIO);
 }
 
 void MeshViewerWidget::PauseOrResumeVideo()
 {
     pause=!pause;
+    if(modelThread)modelThread->setPause(pause);
 }
 
 void MeshViewerWidget::play()
 {
     if(pause)return;
-    if(!models.empty()){
-        MatF model=models.front();
-        models.pop_front();
-        MatF uv=uvs.front();
-        uvs.pop_front();
-        Mat faceTexture=faceTextures.front();
-        faceTextures.pop_front();
+
+    if(resultQueue->TryPop(result)){
+        MatF model, uv;
+        Mat faceTexture;
+        std::tie(model,uv,faceTexture)=result;
         memcpy(pointData,model.data(),sizeof(float)*3*mesh.n_vertices());
         memcpy(uvData,uv.data(),sizeof(float)*2*mesh.n_vertices());
         QImage face=MatConvertQImage::Mat2QImage(faceTexture);
@@ -187,52 +195,26 @@ void MeshViewerWidget::play()
         textures[0]->setMagnificationFilter(QOpenGLTexture::Linear);
         textures[0]->setWrapMode(QOpenGLTexture::Repeat);
         update();
-        return;
 
     }
     if(cur<count-1){
         sequence >> image;
-
         if(image.empty()){
-//            std::cerr<<"read pic fail!"<<std::endl;
-//            std::cout<<"stop:"<<std::endl;
-            std::cout<<cur*1000.0/time.elapsed()<<std::endl;
-            timer->stop();
+            if(imageQueue->IsEmpty()&&resultQueue->IsEmpty()){
+                timer->stop();
+                std::cout<<cur*1000.0/time.elapsed()<<std::endl;
+            }
             destroyWindow("video");
             return;
         }
         cv::resize(image,image,cv::Size(),0.5,0.5);
-        //std::cout<<"---------------------------cur:"<<cur<<std::endl;
-        //time.start();
-        std::tie(models,uvs,faceTextures)=modelPtr->readOnePic(image,first,false);
-
-        if(!models.empty()){
-            MatF model=models.front();
-            models.pop_front();
-            MatF uv=uvs.front();
-            uvs.pop_front();
-            Mat faceTexture=faceTextures.front();
-            faceTextures.pop_front();
-            memcpy(pointData,model.data(),sizeof(float)*3*mesh.n_vertices());
-            memcpy(uvData,uv.data(),sizeof(float)*2*mesh.n_vertices());
-            QImage face=MatConvertQImage::Mat2QImage(faceTexture);
-            if(textures[0]){
-                delete textures[0];
-            }
-            textures[0] = new QOpenGLTexture(face);
-            textures[0]->setMinificationFilter(QOpenGLTexture::Nearest);
-            textures[0]->setMagnificationFilter(QOpenGLTexture::Linear);
-            textures[0]->setWrapMode(QOpenGLTexture::Repeat);
-            update();
-           // modelPtr->draw(faceTexture);
-            //cv::imshow("video",faceTexture);
-        }
+        imageQueue->WaitAndPush(image);
         cur++;
-        //std::cout<<time.elapsed()<<std::endl;
     }else{
-
-        //std::cout<<"stop:"<<std::endl;
-        timer->stop();
+        if(imageQueue->IsEmpty()&&resultQueue->IsEmpty()){
+            timer->stop();
+            std::cout<<cur*1000.0/time.elapsed()<<std::endl;
+        }
         destroyWindow("video");
     }
 }
@@ -403,66 +385,10 @@ void MeshViewerWidget::paintGL(void)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    if (meshQueue.size() > 0) {
-        //        mesh = meshQueue.front(); meshQueue.pop_front();
-        //        pic = imageQueue.front(); imageQueue.pop_front();
-        //        face = faceTextureQueue.front(); faceTextureQueue.pop_front();
-        //        head = headTextureQueue.front(); headTextureQueue.pop_front();
-        //        if (!textures[0]) {
-        //            /*delete textures[0];
-        //            textures[0] = new QOpenGLTexture(MatConvertQImage::Mat2QImage(face).mirrored());
-        //            textures[0]->setMagnificationFilter(QOpenGLTexture::Linear);*/
-        //            QImage buf=MatConvertQImage::Mat2QImage(face).mirrored();
-        //            QImage tex = QGLWidget::convertToGLFormat(buf);
 
-        //            glGenTextures(1, &textures[0]);
+    isUpdate = false;
 
-        //            glBindTexture(GL_TEXTURE_2D, textures[0]);
-        //            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        //            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        //            glTexImage2D(GL_TEXTURE_2D, 0, 3, tex.width(), tex.height(), 0,
-        //                         GL_RGBA, GL_UNSIGNED_BYTE, tex.bits());
-        //        }
-        //        if (!textures[1]) {
-        //            /*delete textures[1];
-        //            textures[1] = new QOpenGLTexture(MatConvertQImage::Mat2QImage(head).mirrored());
-        //            textures[1]->setMagnificationFilter(QOpenGLTexture::Linear);*/
-        //            QImage buf = MatConvertQImage::Mat2QImage(face).mirrored();
-        //            QImage tex = QGLWidget::convertToGLFormat(buf);
 
-        //            glGenTextures(1, &textures[1]);
-
-        //            glBindTexture(GL_TEXTURE_2D, textures[1]);
-        //            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        //            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        //            glTexImage2D(GL_TEXTURE_2D, 0, 3, tex.width(), tex.height(), 0,
-        //                         GL_RGBA, GL_UNSIGNED_BYTE, tex.bits());
-        //        }
-
-        //        if (!isUpdate) {
-        //            UpdateMesh();
-        //            isUpdate = true;
-        //            cv::namedWindow("video", CV_WINDOW_NORMAL);
-        //            cv::imshow("video", pic);
-        //            //cv::waitKey(100);
-        //        }
-        //        else {
-        //            mesh.update_normals();
-        //            cv::imshow("video", pic);
-        //            //cv::waitKey(100);
-        //        }
-
-    }
-    else {
-        /*if (timerId != -1) {
-            killTimer(timerId);
-            timerId = -1;
-            isUpdate = false;
-        }*/
-        //cv::destroyWindow("video");
-        isUpdate = false;
-
-    }
     DrawScene();
 }
 void MeshViewerWidget::timerEvent(QTimerEvent *) {

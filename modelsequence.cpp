@@ -311,13 +311,11 @@ void ModelSequence::readVideo(string videoPath)
     }
 }
 
-std::tuple<std::deque<MatF>,std::deque<MatF>,std::deque<cv::Mat>> ModelSequence::readOnePic(Mat& image,bool& first,bool save)
+std::deque<std::tuple<MatF,MatF,cv::Mat>>& ModelSequence::readOnePic(Mat& image,bool& first,bool save)
 {
     using namespace std;
     using namespace cv;
-    std::deque<MatF> models;
-    std::deque<MatF> uvs;
-    std::deque<Mat> textures;
+    results.clear();
     MatF model;
     MatF uv;
     Mat texture;
@@ -351,10 +349,7 @@ std::tuple<std::deque<MatF>,std::deque<MatF>,std::deque<cv::Mat>> ModelSequence:
             v0=solver.params.R;
             lastDelta=std::acos(v0.w())*2;
             lastZMove=std::fabs(solver.params.tz);
-            std::tie(model,uv,texture)=output(image, std::to_string(success),first,save);
-            models.emplace_back(model);
-            uvs.emplace_back(uv);
-            textures.emplace_back(texture);
+            results.push_back(output(image,std::to_string(success),first,save));
             success++;
             first=false;
 //            std::cout<<"SX:"<<solver.SX<<std::endl;
@@ -424,7 +419,7 @@ std::tuple<std::deque<MatF>,std::deque<MatF>,std::deque<cv::Mat>> ModelSequence:
             Quaternionf vibration=v1*v0.conjugate();
             vibration.normalize();
             float delta=std::acos(vibration.w())*2;
-            if(0/*delta>0.5*M_PI/180||delta>2*lastDelta*/){
+            if(1/*delta>0.5*M_PI/180||delta>2*lastDelta*/){
                 //std::cout<<"hit one!"<<std::endl;
                 Quaternionf v01=v0.slerp(0.4,v1);
                 Eigen::Matrix3f R01=v01.toRotationMatrix();
@@ -442,11 +437,8 @@ std::tuple<std::deque<MatF>,std::deque<MatF>,std::deque<cv::Mat>> ModelSequence:
                 }
                 cv::Mat interImage=0.5*lastImage+0.5*image;
                 std::tie(model,uv,texture)=output(interImage,std::to_string(success),first,save);
-                models.emplace_back(model);
-                uvs.emplace_back(uv);
-                textures.emplace_back(texture);
-                success++;
-                if(delta>M_PI/180||delta>3*lastDelta){
+                results.push_back(output(image,std::to_string(success),first,save));
+                if(1/*delta>M_PI/180||delta>3*lastDelta*/){
                     //std::cout<<"hit two!"<<std::endl;
                     //===================================================
                     Quaternionf v02=v0.slerp(0.7,v1);
@@ -464,13 +456,10 @@ std::tuple<std::deque<MatF>,std::deque<MatF>,std::deque<cv::Mat>> ModelSequence:
                         solver.EX=(solver.EX*0.3+EX*0.7);
                     }
                     cv::Mat interImage2=0.3*lastImage+0.7*image;
-                    std::tie(model,uv,texture)=output(interImage2,std::to_string(success+1),first,save);
-                    models.emplace_back(model);
-                    uvs.emplace_back(uv);
-                    textures.emplace_back(texture);
+                   results.push_back(output(image,std::to_string(success+1),first,save));
                     success++;
                 }
-
+                success++;
             }
             lastDelta=delta;
             lastSX=solver.SX;
@@ -486,12 +475,7 @@ std::tuple<std::deque<MatF>,std::deque<MatF>,std::deque<cv::Mat>> ModelSequence:
 //            std::cout<<"---------------"<<std::endl;
 //            std::cout<<"EX:"<<solver.EX<<std::endl;
 //            std::cout<<"---------------"<<std::endl;
-
-            std::tie(model,uv,texture)=output(image,std::to_string(success+2),first,save);
-
-            models.emplace_back(model);
-            uvs.emplace_back(uv);
-            textures.emplace_back(texture);
+            results.push_back(output(image,std::to_string(success),first,save));
             lastKP=KP;
             lastImage=image;
             v0=v1;
@@ -500,5 +484,5 @@ std::tuple<std::deque<MatF>,std::deque<MatF>,std::deque<cv::Mat>> ModelSequence:
         }
 
     }
-    return std::make_tuple(models,uvs,textures);
+    return results;
 }

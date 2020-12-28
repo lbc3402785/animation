@@ -6,33 +6,30 @@
 #include "MeshDefinition.h"
 #include "meshtools.h"
 #include "QGLViewerWidget.h"
-#include <deque>
+#include <queue>
 #include <QOpenGLTexture>
 #include <QTime>
 #include "modelsequence.h"
+#include "thread/modelthread.h"
 class MeshViewerWidget : public QGLViewerWidget
 {
     Q_OBJECT
 public:
     QTime time;
     std::shared_ptr<ModelSequence> modelPtr;
+    ModelThread* modelThread;
     bool isUpdate = false;
     bool pause=false;
     int timerId;
     int headOffset = 46398;
     int headTriOffset = 92356;
-    std::deque<Mesh> meshQueue;
-    std::deque<cv::Mat> imageQueue;
-    std::deque<cv::Mat> faceTextureQueue;
-    std::deque<cv::Mat> headTextureQueue;
+    std::tuple<MatF,MatF,cv::Mat> result;
     QOpenGLTexture *textures[2] = { nullptr, nullptr };
     //GLuint textures[2] = { 0, 0 };
     cv::Mat pic;
     VideoCapture sequence;
     int count;
-    int cur;
-//    cv::Mat face;
-//    cv::Mat head;
+    int cur; 
     MeshViewerWidget(QWidget* parent = 0);
     virtual ~MeshViewerWidget(void);
     bool LoadMesh(const std::string & filename);
@@ -65,9 +62,7 @@ private:
     QTimer* timer;
     bool first;
     cv::Mat image;
-    std::deque<MatF> models;
-    std::deque<MatF> uvs;
-    std::deque<Mat> faceTextures;
+
     float* pointData;
     float* uvData;
     void makeMesh(MatF& Face,MatI& TRI);
@@ -91,6 +86,9 @@ protected:
     bool isTwoSideLighting;
     bool isDrawBoundingBox;
     bool isDrawBoundary;
+
+    std::shared_ptr<ThreadSafeQueue<cv::Mat>> imageQueue;
+    std::shared_ptr<ThreadSafeQueue< std::tuple<MatF,MatF,cv::Mat> > > resultQueue;
 };
 
 #endif // MESHVIEWERWIDGET_H
